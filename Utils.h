@@ -87,3 +87,14 @@ static void* findSig(const char* sig) {
         }
     }
 }
+
+void* shiftAddress(void* a, uintptr_t b) {
+    return (void*)(reinterpret_cast<uintptr_t>(a) - b);
+}
+
+// i absolutely despise this. (not used at all, you can delete this)
+// new favorite function :)
+template <typename R, typename T>
+R readArray(R arr, T index) {
+    return (R)(*((arr)+(index)));
+}

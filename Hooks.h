@@ -37,22 +37,25 @@ void MouseDetourHook(void* _this, __int8 mouseButton, bool isDown, __int16 mouse
 
         switch (mouseButton)
         {
-        case 1:
-            io.MouseDown[0] = isDown;
-            break;
-        case 2:
-            io.MouseDown[1] = isDown;
-            break;
-        case 3:
-            io.MouseDown[2] = isDown;
-            break;
-        case 4:
-            io.MouseWheel = isDown < 0 ? -0.5f : 0.5f;
+            case 1:
+                io.MouseDown[0] = isDown;
+                break;
+        
+            case 2:
+                io.MouseDown[1] = isDown;
+                break;
+        
+            case 3:
+                io.MouseDown[2] = isDown;
+                break;
 
-            if (Global::Keymap['C'])
-                Global::ZoomMag += isDown < 0 ? -2.f : 2.f;
+            case 4:
+                io.MouseWheel = isDown > 136 ? -0.5f : 0.5f;
 
-            break;
+                if (Global::Keymap['C'])
+                    Global::ZoomMag += isDown < 136 ? -2.f : 2.f;
+
+                break;
         }
 
         if (io.WantCaptureMouse)
@@ -65,15 +68,17 @@ void MouseDetourHook(void* _this, __int8 mouseButton, bool isDown, __int16 mouse
 }
 
 float fovHook(LevelRendererPlayer* self, float a, bool a2) {
+    float read = ((float(*)(LevelRendererPlayer*, float, bool))fovBack)(self, a, a2);
+    
     if (!mEnabled) {
         currentFOV = -1.f;
-        return ((float(*)(LevelRendererPlayer*, float, bool))fovBack)(self, a, a2);
+        return read;
     }
 
     if (currentFOV == -1.f)
-        currentFOV = ((float(*)(LevelRendererPlayer*, float, bool))fovBack)(self, a, a2);
+        currentFOV = read;
 
-    Global::DefFOV = ((float(*)(LevelRendererPlayer*, float, bool))fovBack)(self, a, a2);
+    Global::DefFOV = read;
 
     float targetFOV = (Global::Mode == 0) ? Global::ZoomMag : Global::DefFOV;
 
@@ -83,7 +88,7 @@ float fovHook(LevelRendererPlayer* self, float a, bool a2) {
     else if (Global::Mode == 0)
         currentFOV += (targetFOV - currentFOV) * Global::ZoomSpeed * ImGui::GetIO().DeltaTime;
 
-    return currentFOV;
+    return max(currentFOV, read);
 }
 
 float sensitivityHook(BaseOptions* self, unsigned int inputMode) {
@@ -139,11 +144,10 @@ void callRender()
         ImGui::Text("Zoom: %.3f", currentFOV);
         ImGui::Text("Loaded Hooks:");
 
-        //   :/
-        ImGui::BulletText("%s FOV (Minecraft+%p)", Sigs::bFOV ? "[ERR]" : "[OK]", (void*)((uintptr_t)Sigs::aFOV - Global::base));
-        ImGui::BulletText("%s Sensitivity (Minecraft+%p)", Sigs::bSens ? "[ERR]" : "[OK]", (void*)((uintptr_t)Sigs::aSens - Global::base));
-        ImGui::BulletText("%s Mouse (Minecraft+%p)", Sigs::bMouse ? "[ERR]" : "[OK]", (void*)((uintptr_t)Sigs::aMouse - Global::base));
-        ImGui::BulletText("%s Keymap (Minecraft+%p)", Sigs::bKeymap ? "[ERR]" : "[OK]", (void*)((uintptr_t)Sigs::aKeymap - Global::base));
+        ImGui::BulletText("%s FOV (Minecraft+%p)"        , Sigs::aFOV != 0x0 ? "[ERR]" : "[OK]", shiftAddress(Sigs::aFOV, Global::base));
+        ImGui::BulletText("%s Sensitivity (Minecraft+%p)", Sigs::aSens != 0x0 ? "[ERR]" : "[OK]", shiftAddress(Sigs::aSens, Global::base));
+        ImGui::BulletText("%s Mouse (Minecraft+%p)"      , Sigs::aMouse != 0x0 ? "[ERR]" : "[OK]", shiftAddress(Sigs::aMouse, Global::base));
+        ImGui::BulletText("%s Keymap (Minecraft+%p)"     , Sigs::aKeymap != 0x0 ? "[ERR]" : "[OK]", shiftAddress(Sigs::aKeymap, Global::base));
     }
 }
 
@@ -200,28 +204,22 @@ void loadFonts() {
     {
         ImVec4& col = style.Colors[i];
         float H, S, V;
-        ImGui::ColorConvertRGBtoHSV(col.x, col.y, col.z, H, S, V);
 
+        ImGui::ColorConvertRGBtoHSV(col.x, col.y, col.z, H, S, V);
         if (S < 0.1f)
-        {
             V = 1.0f - V;
-        }
+
         ImGui::ColorConvertHSVtoRGB(H, S, V, col.x, col.y, col.z);
         if (col.w < 1.00f)
-        {
             col.w *= _alpha;
-        }
     }
 }
 
 HRESULT D3D12_PresentDetour(IDXGISwapChain3* swapchain, UINT syncInterval, UINT flags) {
     Global::Window = FindWindowA(nullptr, "Minecraft");
 
-    if (!Global::Window)
-        Global::Window = FindWindowA(nullptr, "Minecraft: Developer Edition");
-
-    if (!Global::Window)
-        return CallFunc<HRESULT, IDXGISwapChain3*, UINT, UINT>(oPresent, swapchain, syncInterval, flags);
+    if (!Global::Window) Global::Window = FindWindowA(nullptr, "Minecraft: Developer Edition");
+    if (!Global::Window) return CallFunc<HRESULT, IDXGISwapChain3*, UINT, UINT>(oPresent, swapchain, syncInterval, flags);
 
     if (!SUCCEEDED(swapchain->GetDevice(IID_PPV_ARGS(&d3d11Device)))) {
         if (SUCCEEDED(swapchain->GetDevice(IID_PPV_ARGS(&d3d12Device)))) {
@@ -254,7 +252,7 @@ HRESULT D3D12_PresentDetour(IDXGISwapChain3* swapchain, UINT syncInterval, UINT 
     ImGui::NewFrame();
 
     ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = Global::MousePos;
+    ImGui::SetMousePos(Global::MousePos);
 
     if (Global::Keymap[VK_INSERT] && Global::Keymap[VK_INSERT] != pToggle)
         Global::RenderWindow = !Global::RenderWindow;

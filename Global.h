@@ -77,12 +77,5 @@ namespace Sigs {
 	void* aMouse = 0x0;
 	void* aSens = 0x0;
 	void* aKeymap = 0x0;
-	void* aChat = 0x0;
-
-	bool bFOV = false;
-	bool bMouse = false;
-	bool bSens = false;
-	bool bKeymap = false;
-	bool bChat = false;
 }
 
