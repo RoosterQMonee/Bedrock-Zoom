@@ -1,4 +1,4 @@
-# Bedrock-Zoom
+# Bedrock Zoom
 A small Minecraft: Bedrock zoom mod :)
 
 *This isn't programmed very well, I made it in 10-20 mins*
